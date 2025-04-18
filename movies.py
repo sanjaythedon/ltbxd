@@ -51,11 +51,8 @@ def getReviewUrls(user):
     sleep(.05)
     try:
         lastValidPage = int(pageDiv.split('/films/reviews/page/')[-1].split('/')[0])
-        print(lastValidPage)
         return [f'{reviewsBaseUrl}page/{str(i)}' for i in range(1, lastValidPage + 1)]
-
     except ValueError:
-
         return [reviewsBaseUrl]
 
 
@@ -65,8 +62,8 @@ def getSingleReview(url=''):
         reviewDivHtmlStr = str(soup.find("div", {'class': "review body-text -prose -hero -loose"}))
         sleep(.05)
         if not reviewDivHtmlStr  == 'None':
-            return '<p>' + reviewDivHtmlStr.split('<div><p>')[-1].replace('</div>', '')
-
+            return '<p>' + reviewDivHtmlStr.split('<p>')[-1].replace('</div>', '')
+    return None
 
 
 # Should probably make different functions for batch getting all movies and searching.
@@ -90,8 +87,6 @@ def getReviews(user):
             reviewsText[movie] = getSingleReview(url=url)
         return reviewsText
 
-
-
     reviewUrls = getReviewUrls(user)
     console.print('[cyan] Urls with multiple reviews')
     rprint(reviewUrls)
@@ -106,37 +101,47 @@ def getReviews(user):
         console.print(movieDelim)
         htmlText = response.text
 
-        valuableStart = htmlText.find('<ul class="poster-list -p70 film-list clear film-details-list no-title">')
-        valuableEnd = htmlText.find('</section>', valuableStart)
-        smallStr = htmlText[valuableStart:valuableEnd]
-
-        for line in [line for line in smallStr.splitlines() if line.strip()[10:24] =='"film-detail">']:
-
-
-            shorterLine = line[line.find('<p>'):]
-
-            movieSearch = re.search( fr'{look}.*?/', shorterLine).group()
-            movie = re.sub(fr'{look}','', str(movieSearch))[:-1]
-
+        soup = BeautifulSoup(htmlText, 'html.parser')
+        review_items = soup.select('li.film-detail')
+        
+        for item in review_items:
+            movie_link = item.select_one('h2.headline-2 a')
+            if not movie_link:
+                continue
+                
+            movie = movie_link['href'].split('/film/')[-1].rstrip('/')
             console.print(f'[cyan]movie: [bold blue]{movie}')
-            reviewPreview = shorterLine[:shorterLine.find('</div>')].strip()
-
-            if '…' == reviewPreview[-5]: #NOT THREE PERIODS - DIFFERENT UNICODE CHAR
+            
+            review_text = item.select_one('.js-review-body')
+            if not review_text:
+                continue
+                
+            # Check if this is a partial review (has ellipsis)
+            review_preview = review_text.text.strip()
+            
+            if review_preview.endswith('…'):  # NOT THREE PERIODS - DIFFERENT UNICODE CHAR
                 movieReviewUrl = f'https://letterboxd.com/{user}/film/{movie}/'
                 console.print('\t[magenta]Preview contains partial review')
                 console.print(f'\t[magenta]Requesting: {movieReviewUrl}')
                 console.print(movieDelim)
 
-                reviewsText[movie] = getSingleReview(url=movieReviewUrl)
-
+                full_review = getSingleReview(url=movieReviewUrl)
+                if full_review:
+                    reviewsText[movie] = full_review
+                else:
+                    # If we can't get the full review, use what we have
+                    reviewsText[movie] = str(review_text)
             else:
                 console.print('\t[blue]Preview contains full review')
                 console.print('\t[blue]No need to request individual page')
                 console.print(movieDelim)
-
-                reviewsText[movie] = reviewPreview
-
-
+                
+                # Get the actual review HTML
+                p_tag = review_text.find('p')
+                if p_tag:
+                    reviewsText[movie] = str(p_tag)
+                else:
+                    reviewsText[movie] = str(review_text)
 
             sleep(.05)
 
