@@ -143,7 +143,71 @@ def getWatchlist(user):
         # Looking at the HTML, actual movies are in a specific section after the watchlist count header
         watchlist_header = soup.find('h1', string=lambda text: text and "wants to see" in text)
         
-        if watchlist_header:
+        console.print(f'[magenta]Watchlist header found: {watchlist_header is not None}')
+        
+        # If we can't find the standard header, try an alternative approach
+        if not watchlist_header:
+            # Try to find the poster grid directly - this is the main container for films
+            poster_grid = soup.find('ul', class_='poster-list')
+            if poster_grid:
+                console.print(f'[green]Found poster list directly')
+                film_posters = poster_grid.find_all('li', class_='poster-container')
+                console.print(f'[green]Found {len(film_posters)} film posters')
+                
+                for poster in film_posters:
+                    # Find div.film-poster which contains all the movie data
+                    film_poster = poster.find('div', class_='film-poster')
+                    if film_poster:
+                        # Get the film slug (contains the title)
+                        film_slug = film_poster.get('data-film-slug', '')
+                        
+                        # Get the title from img alt attribute since frame-title is empty
+                        film_title = ''
+                        img = film_poster.find('img')
+                        if img and img.get('alt'):
+                            film_title = img['alt'].strip()
+                        
+                        # If we couldn't get the title from img alt, try to parse from the slug
+                        if not film_title and film_slug:
+                            # Convert slug to title (replace hyphens with spaces and capitalize)
+                            film_title = film_slug.replace('-', ' ').title()
+                            # Remove year from slug if it exists
+                            if film_title.endswith(tuple(str(year) for year in range(1900, 2030))):
+                                film_title = ' '.join(film_title.split()[:-1])
+                        
+                        # Try to get the year from film-poster data
+                        film_year = film_poster.get('data-film-release-year', '')
+                        
+                        # If we couldn't get the year from data attributes, try to extract from slug
+                        if not film_year and film_slug and film_slug[-4:].isdigit():
+                            film_year = film_slug[-4:]
+                        
+                        # If we still don't have a year but the title has a year in parentheses, extract it
+                        if not film_year and '(' in film_title and ')' in film_title:
+                            year_match = re.search(r'\((\d{4})\)', film_title)
+                            if year_match:
+                                film_year = year_match.group(1)
+                                # Remove the year from the title
+                                film_title = film_title.split('(')[0].strip()
+                        
+                        if film_title:
+                            # Create a full title with year if available
+                            full_title = film_title
+                            if film_year:
+                                full_title = f"{film_title} ({film_year})"
+                            
+                            # Create the ID from just the title (no year)
+                            movie_id = film_slug if film_slug else film_title.lower().replace(' ', '-').replace(':', '').replace('&', 'and')
+                            
+                            movie_info = {
+                                "title": full_title,
+                                "id": movie_id
+                            }
+                            watchlist.append(movie_info)
+                            console.print(f'[cyan]Added film: [bold blue]{full_title}')
+                            continue
+            
+        elif watchlist_header:
             console.print(f'[green]Found watchlist header: {watchlist_header.text}')
             
             # Find films between the header and the pagination section
@@ -156,53 +220,35 @@ def getWatchlist(user):
                     
                     # Now extract the movies from this list - they should be direct children of this ul
                     film_posters = current_element.find_all('li', class_='poster-container')
+                    console.print(f'[green]Found {len(film_posters)} film posters')
                     
                     for poster in film_posters:
-                        # Find the title from image alt text
-                        img = poster.find('img')
-                        if img and img.get('alt'):
-                            title = img['alt'].strip()
-                            # Double check it's not a UI element
-                            if title and title not in non_movie_set:
-                                movie_id = title.lower().replace(' ', '-').replace(':', '').replace('&', 'and')
-                                movie_info = {
-                                    "title": title,
-                                    "id": movie_id
-                                }
-                                watchlist.append(movie_info)
-                                console.print(f'[cyan]Added film: [bold blue]{title}')
+                        # Look for the frame element that contains the title with year
+                        frame_element = poster.find('a', class_='frame')
+                        if frame_element:
+                            # Find the span with class 'frame-title' which has the format "Title (Year)"
+                            title_span = frame_element.find('span', class_=['frame-title', 'film-title', 'title'])
+                            if title_span and title_span.text.strip():
+                                full_title = title_span.text.strip()
+                                
+                                # Extract the base title without year for the ID
+                                # If the title has format "Title (Year)", extract just "Title"
+                                if '(' in full_title and ')' in full_title:
+                                    basic_title = full_title.split('(')[0].strip()
+                                else:
+                                    basic_title = full_title
+                                
+                                # Double check it's not a UI element
+                                if basic_title and basic_title not in non_movie_set:
+                                    movie_id = basic_title.lower().replace(' ', '-').replace(':', '').replace('&', 'and')
+                                    movie_info = {
+                                        "title": full_title,
+                                        "id": movie_id
+                                    }
+                                    watchlist.append(movie_info)
+                                    console.print(f'[cyan]Added film: [bold blue]{full_title}')
                 
                 current_element = current_element.find_next_sibling()
-        
-        # APPROACH 2: Extract movies using the hard-coded list from the HTML
-        # If we couldn't find any movies, try extracting from the literal list of movie titles visible in the HTML
-        if not watchlist:
-            console.print(f'[yellow]First approach failed, trying extraction from known movie list')
-            
-            # These are the exact movie titles we saw in the HTML
-            known_movies = [
-                "Jamon Jamon", "Booksmart", "Pixels", "I Now Pronounce You Chuck & Larry",
-                "Date Night", "Guess Who", "On the Rocks", "Entourage", "Charm City Kings",
-                "Emilia Pérez", "The Holiday", "The Founder", "Rifle Club", "Malcolm X",
-                "Set It Off", "The Best Man Holiday", "The Best Man", "No Strings Attached",
-                "Last Holiday", "Arinthum Ariyamalum", "Pattiyal", "Gladiator II",
-                "Ae Dil Hai Mushkil", "Bougainvillea", "The Accountant", "Hot Fuzz",
-                "La Haine", "1992", "Boyz n the Hood", "The Good, the Bad and the Ugly",
-                "Soul", "Cocaine Bear", "Training Day", "American Gangster", "City of Tiny Lights",
-                "21", "Kingsman: The Secret Service", "Neighbors", "Night at the Museum",
-                "The Beast", "The Proposal", "Blended", "You Are So Not Invited to My Bat Mitzvah",
-                "Dune: Part Two", "Incredibles 2", "Good Will Hunting", "Very Bad Things",
-                "Why Him?", "Furiosa: A Mad Max Saga", "Fences", "Love Lies Bleeding"
-            ]
-            
-            for movie in known_movies:
-                movie_id = movie.lower().replace(' ', '-').replace(':', '').replace('&', 'and')
-                movie_info = {
-                    "title": movie,
-                    "id": movie_id
-                }
-                watchlist.append(movie_info)
-                console.print(f'[cyan]Added film from known list: [bold blue]{movie}')
         
         sleep(0.5)  # Be polite to the server
     
