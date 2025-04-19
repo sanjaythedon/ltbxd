@@ -78,7 +78,7 @@ class ProxyUtility:
                     print(f"Request failed with status code {response.status_code}")
             except Exception as e:
                 print(f"Error with proxy {proxy}: {e}")
-                self.remove_current_proxy()
+                # self.remove_current_proxy()
             
             retries += 1
         
