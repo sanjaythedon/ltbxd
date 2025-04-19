@@ -3,8 +3,10 @@ import os
 import requests
 import time
 from proxy_utility import ProxyUtility
+from google_sheets_utility import GoogleSheetsUtility
 
-def download_best_quality_torrents(json_file='yts_movie_data.json', output_folder='torrents', request_delay=1.0):
+def download_best_quality_torrents(json_file='yts_movie_data.json', output_folder='torrents', request_delay=1.0, 
+                                 credentials_file=None, sheet_id=None, share_with_email=None):
     """
     Downloads best quality torrents for movies in the YTS movie data file.
     Priority: 2160p > 1080p bluray > 1080p web
@@ -13,6 +15,9 @@ def download_best_quality_torrents(json_file='yts_movie_data.json', output_folde
         json_file: Path to the YTS movie data JSON file
         output_folder: Folder to save the torrent files
         request_delay: Delay in seconds between torrent download requests
+        credentials_file: Path to Google API credentials file
+        sheet_id: Google Sheet ID to track downloads (if None, a new sheet will be created)
+        share_with_email: Email address to share the created sheet with
     """
     # Create output folder if it doesn't exist
     if not os.path.exists(output_folder):
@@ -21,6 +26,23 @@ def download_best_quality_torrents(json_file='yts_movie_data.json', output_folde
     
     # Initialize proxy utility
     proxy_util = ProxyUtility()
+    
+    # Initialize Google Sheets tracking (if credentials provided)
+    sheets_util = None
+    if credentials_file:
+        try:
+            sheets_util = GoogleSheetsUtility(credentials_file)
+            if not sheet_id:
+                sheet_id = sheets_util.create_movie_tracking_sheet(share_with=share_with_email)
+                print(f"Created a new tracking sheet with ID: {sheet_id}")
+            elif share_with_email and sheets_util:
+                # Share existing sheet if email is provided
+                sheets_util.share_sheet(sheet_id, share_with_email)
+                
+            print(f"Using Google Sheet ID: {sheet_id} for tracking downloads")
+        except Exception as e:
+            print(f"WARNING: Could not initialize Google Sheets tracking: {e}")
+            sheets_util = None
     
     # Load the JSON data
     with open(json_file, 'r') as f:
@@ -88,6 +110,7 @@ def download_best_quality_torrents(json_file='yts_movie_data.json', output_folde
                         file_path = os.path.join(output_folder, filename)
                         
                         # Download the torrent file using proxy
+                        download_success = False
                         try:
                             response = proxy_util.request(torrent_url)
                             
@@ -96,8 +119,18 @@ def download_best_quality_torrents(json_file='yts_movie_data.json', output_folde
                                 with open(file_path, 'wb') as torrent_file:
                                     torrent_file.write(response.content)
                                 
+                                download_success = True
                                 successful_downloads += 1
                                 print(f"Successfully downloaded to {file_path}")
+                                
+                                # Add to Google Sheet if tracking is enabled
+                                if sheets_util and sheet_id:
+                                    sheets_util.add_movie_entry(
+                                        sheet_id=sheet_id,
+                                        movie_name=movie_title,
+                                        year=movie_year,
+                                        is_downloaded=True
+                                    )
                             else:
                                 print(f"Failed to download torrent for {movie_title}")
                         except Exception as e:
@@ -121,6 +154,15 @@ def download_best_quality_torrents(json_file='yts_movie_data.json', output_folde
     print(f"  - 1080p Web: {quality_stats['1080p_web']}")
     print(f"Successfully downloaded torrents: {successful_downloads}")
     print(f"Torrents saved to: {os.path.abspath(output_folder)}")
+    if sheets_util and sheet_id:
+        print(f"Download tracking available at: https://docs.google.com/spreadsheets/d/{sheet_id}")
 
 if __name__ == "__main__":
-    download_best_quality_torrents(request_delay=2.0) # Default 2 second delay 
+    # You can provide Google credentials file path and optionally an existing sheet ID
+    # If sheet_id is None, a new sheet will be created
+    download_best_quality_torrents(
+        request_delay=2.0,  # Default 2 second delay
+        credentials_file='/Users/aaa/projects/lb/letterboxd/ltbxd-457319-fb2679bd42ac.json',
+        sheet_id=os.environ.get('GOOGLE_SHEET_ID'),
+        share_with_email='shanjairajan54@gmail.com'  # Set this environment variable with your email
+    ) 
