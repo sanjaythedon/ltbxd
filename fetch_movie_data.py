@@ -21,8 +21,11 @@ def main():
         
         print(f"Fetching data for movie: {movie.get('title')} (ID: {movie_id})")
         
+        # Replace minus signs with %20 in the movie ID
+        formatted_id = movie_id.replace('-', '%20')
+        
         # Build API URL with query parameter
-        url = f'https://yts.mx/api/v2/list_movies.json?query_term={movie_id}'
+        url = f'https://yts.mx/api/v2/list_movies.json?query_term={formatted_id}'
         
         # Make request through proxy
         response = proxy_util.request(url)
