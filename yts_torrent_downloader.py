@@ -101,6 +101,7 @@ def download_best_quality_torrents(json_file='yts_movie_data.json', output_folde
                     if selected_torrent:
                         movies_with_torrents += 1
                         torrent_url = selected_torrent['url']
+                        film_id = movie.get('id', None)  # Get the unique film ID
                         
                         print(f"Found {quality_type} torrent for '{movie_title} ({movie_year})': {torrent_url}")
                         
@@ -129,6 +130,7 @@ def download_best_quality_torrents(json_file='yts_movie_data.json', output_folde
                                         sheet_id=sheet_id,
                                         movie_name=movie_title,
                                         year=movie_year,
+                                        film_id=film_id,
                                         is_downloaded=True
                                     )
                             else:

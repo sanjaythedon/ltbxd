@@ -71,14 +71,14 @@ class GoogleSheetsUtility:
             self.sheet_id = spreadsheet['spreadsheetId']
             
             # Add headers
-            values = [['Movie name', 'Year', 'Is downloaded']]
+            values = [['Movie name', 'Year', 'Film ID', 'Is downloaded']]
             body = {
                 'values': values
             }
             
             self.service.spreadsheets().values().update(
                 spreadsheetId=self.sheet_id, 
-                range='Movies!A1:C1',
+                range='Movies!A1:D1',
                 valueInputOption='RAW',
                 body=body
             ).execute()
@@ -131,7 +131,7 @@ class GoogleSheetsUtility:
             print(f"An error occurred while sharing the sheet: {error}")
             return False
     
-    def add_movie_entry(self, sheet_id, movie_name, year, is_downloaded=True):
+    def add_movie_entry(self, sheet_id, movie_name, year, film_id=None, is_downloaded=True):
         """
         Add a movie entry to the tracking sheet.
         
@@ -139,6 +139,7 @@ class GoogleSheetsUtility:
             sheet_id: ID of the Google Sheet
             movie_name: Name of the movie
             year: Release year of the movie
+            film_id: Unique identifier of the film
             is_downloaded: Whether the torrent was downloaded successfully
             
         Returns:
@@ -156,12 +157,12 @@ class GoogleSheetsUtility:
             
             # Add the new entry
             body = {
-                'values': [[movie_name, year, str(is_downloaded)]]
+                'values': [[movie_name, year, film_id, str(is_downloaded)]]
             }
             
             self.service.spreadsheets().values().update(
                 spreadsheetId=sheet_id,
-                range=f'Movies!A{next_row}:C{next_row}',
+                range=f'Movies!A{next_row}:D{next_row}',
                 valueInputOption='RAW',
                 body=body
             ).execute()
