@@ -165,6 +165,6 @@ if __name__ == "__main__":
     download_best_quality_torrents(
         request_delay=2.0,  # Default 2 second delay
         credentials_file='/Users/aaa/projects/lb/letterboxd/ltbxd-457319-fb2679bd42ac.json',
-        sheet_id=os.environ.get('GOOGLE_SHEET_ID'),
+        sheet_id='1S6yZ5osVGhfmqwFKQbKfPg5B2j0CqKTAmUHnJIhB6pA',  # Use the specified sheet ID
         share_with_email='shanjairajan54@gmail.com'  # Set this environment variable with your email
     ) 
