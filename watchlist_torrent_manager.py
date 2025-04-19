@@ -346,7 +346,7 @@ if __name__ == "__main__":
         letterboxd_username="kokkithedon",  # Replace with your Letterboxd username
         output_folder="torrents",
         request_delay=2.0,
-        credentials_file='/Users/aaa/projects/lb/letterboxd/ltbxd-457319-fb2679bd42ac.json',
+        credentials_file='./ltbxd-457319-b911c40746e0.json',
         sheet_id='1S6yZ5osVGhfmqwFKQbKfPg5B2j0CqKTAmUHnJIhB6pA',
         share_with_email='shanjairajan54@gmail.com'
     ) 
