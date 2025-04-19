@@ -90,7 +90,7 @@ if __name__ == "__main__":
     # Test the utility
     proxy_util = ProxyUtility()
     
-    response = proxy_util.request('https://yts.mx/api/v2/list_movies.json?query_term=love%20lies%20bleeding%202024')
+    response = proxy_util.request('https://yts.mx/api/v2/list_movies.json?query_term=the%20beast%202023')
     
     if response:
         data = response.json()

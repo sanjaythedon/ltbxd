@@ -270,6 +270,12 @@ def getWatchlist(user):
                                 # Create the ID from just the title (no year)
                                 movie_id = film_slug if film_slug else film_title.lower().replace(' ', '-').replace(':', '').replace('&', 'and')
                                 
+                                # Add year to the ID if available
+                                if film_year:
+                                    # Check if the year is already in the ID
+                                    if not movie_id.endswith(f"-{film_year}"):
+                                        movie_id = f"{movie_id}-{film_year}"
+                                
                                 movie_info = {
                                     "title": full_title,
                                     "id": movie_id
@@ -354,6 +360,12 @@ def getWatchlist(user):
                                 # Double check it's not a UI element
                                 if film_title and film_title not in non_movie_set:
                                     movie_id = film_slug if film_slug else film_title.lower().replace(' ', '-').replace(':', '').replace('&', 'and')
+                                    
+                                    # Add year to the ID if available
+                                    if film_year:
+                                        # Check if the year is already in the ID
+                                        if not movie_id.endswith(f"-{film_year}"):
+                                            movie_id = f"{movie_id}-{film_year}"
                                     
                                     # Create a full title with year if available
                                     full_title = film_title
