@@ -177,3 +177,32 @@ class GoogleSheetsUtility:
     def get_sheet_id(self):
         """Return the current sheet ID"""
         return self.sheet_id 
+        
+    def get_sheet_data(self, sheet_id, range_name='Movies!A:Z'):
+        """
+        Get data from a Google Sheet.
+        
+        Args:
+            sheet_id: ID of the Google Sheet
+            range_name: Range to get data from (default: all columns in 'Movies' sheet)
+            
+        Returns:
+            List of rows with values
+        """
+        try:
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=sheet_id,
+                range=range_name
+            ).execute()
+            
+            values = result.get('values', [])
+            
+            if not values:
+                print(f"No data found in sheet {sheet_id}")
+                return []
+                
+            return values
+            
+        except HttpError as error:
+            print(f"An error occurred while getting sheet data: {error}")
+            return [] 

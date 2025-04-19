@@ -98,7 +98,6 @@ def getWatchlistUrls(user):
         
         # Get the page source after JavaScript has executed
         html_text = driver.page_source
-        print(html_text)
         soup = BeautifulSoup(html_text, 'html.parser')
         
         # Now we have the JavaScript-rendered HTML
