@@ -1,6 +1,5 @@
 *.html
 working_proxies.json
-working_yts_proxies.json
 venv/
 __pycache__/
 *.log

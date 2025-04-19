@@ -1,15 +1,18 @@
 import json
 import os
 import requests
+import time
 from proxy_utility import ProxyUtility
 
-def download_2160p_torrents(json_file='yts_movie_data.json', output_folder='torrents'):
+def download_best_quality_torrents(json_file='yts_movie_data.json', output_folder='torrents', request_delay=1.0):
     """
-    Downloads 2160p torrents for movies in the YTS movie data file.
+    Downloads best quality torrents for movies in the YTS movie data file.
+    Priority: 2160p > 1080p bluray > 1080p web
     
     Args:
         json_file: Path to the YTS movie data JSON file
         output_folder: Folder to save the torrent files
+        request_delay: Delay in seconds between torrent download requests
     """
     # Create output folder if it doesn't exist
     if not os.path.exists(output_folder):
@@ -26,10 +29,12 @@ def download_2160p_torrents(json_file='yts_movie_data.json', output_folder='torr
     # Count variables for stats
     total_entries = len(data)
     processed_entries = 0
-    movies_with_2160p = 0
+    movies_with_torrents = 0
+    quality_stats = {'2160p': 0, '1080p_bluray': 0, '1080p_web': 0}
     successful_downloads = 0
     
     print(f"Processing {total_entries} entries from {json_file}...")
+    print(f"Using {request_delay} second delay between requests")
     
     # Process each entry in the JSON
     for movie_key, movie_data in data.items():
@@ -44,18 +49,42 @@ def download_2160p_torrents(json_file='yts_movie_data.json', output_folder='torr
                 
                 # Check if the movie has torrents
                 if 'torrents' in movie and movie['torrents']:
-                    # Filter for 2160p quality
-                    torrents_2160p = [t for t in movie['torrents'] if t.get('quality') == '2160p']
+                    selected_torrent = None
+                    quality_type = None
                     
+                    # 1. Check for 2160p quality
+                    torrents_2160p = [t for t in movie['torrents'] if t.get('quality') == '2160p']
                     if torrents_2160p:
-                        movies_with_2160p += 1
-                        torrent_url = torrents_2160p[0]['url']
+                        selected_torrent = torrents_2160p[0]
+                        quality_type = '2160p'
+                        quality_stats['2160p'] += 1
+                    else:
+                        # 2. Check for 1080p bluray
+                        torrents_1080p_bluray = [t for t in movie['torrents'] 
+                                               if t.get('quality') == '1080p' and t.get('type', '').lower() == 'bluray']
+                        if torrents_1080p_bluray:
+                            selected_torrent = torrents_1080p_bluray[0]
+                            quality_type = '1080p_bluray'
+                            quality_stats['1080p_bluray'] += 1
+                        else:
+                            # 3. Check for 1080p web
+                            torrents_1080p_web = [t for t in movie['torrents'] 
+                                                if t.get('quality') == '1080p' and t.get('type', '').lower() == 'web']
+                            if torrents_1080p_web:
+                                selected_torrent = torrents_1080p_web[0]
+                                quality_type = '1080p_web'
+                                quality_stats['1080p_web'] += 1
+                    
+                    # If we found a torrent matching our criteria
+                    if selected_torrent:
+                        movies_with_torrents += 1
+                        torrent_url = selected_torrent['url']
                         
-                        print(f"Found 2160p torrent for '{movie_title} ({movie_year})': {torrent_url}")
+                        print(f"Found {quality_type} torrent for '{movie_title} ({movie_year})': {torrent_url}")
                         
                         # Create a safe filename
                         safe_title = "".join([c if c.isalnum() or c in ' ._-' else '_' for c in movie_title])
-                        filename = f"{safe_title}_{movie_year}_2160p.torrent"
+                        filename = f"{safe_title}_{movie_year}_{quality_type}.torrent"
                         file_path = os.path.join(output_folder, filename)
                         
                         # Download the torrent file using proxy
@@ -73,6 +102,10 @@ def download_2160p_torrents(json_file='yts_movie_data.json', output_folder='torr
                                 print(f"Failed to download torrent for {movie_title}")
                         except Exception as e:
                             print(f"Error downloading {movie_title} torrent: {e}")
+                        
+                        # Sleep to avoid overwhelming the proxy server
+                        print(f"Waiting {request_delay} seconds before next request...")
+                        time.sleep(request_delay)
         
         # Print progress every 10 entries
         if processed_entries % 10 == 0:
@@ -81,9 +114,13 @@ def download_2160p_torrents(json_file='yts_movie_data.json', output_folder='torr
     # Print summary
     print("\n--- Download Summary ---")
     print(f"Total entries processed: {processed_entries}")
-    print(f"Movies with 2160p quality found: {movies_with_2160p}")
+    print(f"Movies with matching torrents found: {movies_with_torrents}")
+    print(f"Quality breakdown:")
+    print(f"  - 2160p: {quality_stats['2160p']}")
+    print(f"  - 1080p Bluray: {quality_stats['1080p_bluray']}")
+    print(f"  - 1080p Web: {quality_stats['1080p_web']}")
     print(f"Successfully downloaded torrents: {successful_downloads}")
     print(f"Torrents saved to: {os.path.abspath(output_folder)}")
 
 if __name__ == "__main__":
-    download_2160p_torrents() 
+    download_best_quality_torrents(request_delay=2.0) # Default 2 second delay 
