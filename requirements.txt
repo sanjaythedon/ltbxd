@@ -1,0 +1,4 @@
+requests==2.31.0
+beautifulsoup4==4.12.2
+rich==13.4.2
+selenium==4.31.0 
