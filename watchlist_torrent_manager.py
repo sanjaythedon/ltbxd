@@ -348,9 +348,9 @@ if __name__ == "__main__":
     # Set your preferences here
     process_watchlist_and_download_torrents(
         letterboxd_username="kokkithedon",  # Replace with your Letterboxd username
-        output_folder="torrents",
+        output_folder=os.path.join(script_dir, "torrents"),
         request_delay=2.0,
-        credentials_file='./ltbxd-457319-b911c40746e0.json',
+        credentials_file=os.path.join(script_dir, 'ltbxd-457319-b911c40746e0.json'),
         sheet_id='1S6yZ5osVGhfmqwFKQbKfPg5B2j0CqKTAmUHnJIhB6pA',
         share_with_email='shanjairajan54@gmail.com'
     ) 
