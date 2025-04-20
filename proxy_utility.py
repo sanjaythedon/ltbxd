@@ -4,8 +4,18 @@ import random
 import os
 
 class ProxyUtility:
-    def __init__(self, proxy_file='working_yts_proxies.json'):
+    def __init__(self, proxy_file=None):
         """Initialize the proxy utility"""
+        # Get the directory where the script is located
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Use the provided proxy_file or default to one in script directory
+        if proxy_file is None:
+            proxy_file = os.path.join(script_dir, 'working_yts_proxies.json')
+        # If the provided path is relative, make it absolute
+        elif not os.path.isabs(proxy_file):
+            proxy_file = os.path.join(script_dir, proxy_file)
+            
         self.proxy_file = proxy_file
         self.proxies = self._load_proxies()
         self.current_proxy = None
