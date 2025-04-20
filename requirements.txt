@@ -40,7 +40,6 @@ Pygments==2.19.1
 pyparsing==3.2.3
 PySocks==1.7.1
 python-dotenv==1.1.0
-pyvpn==1.2
 PyYAML==6.0.2
 requests==2.31.0
 requests-oauthlib==2.0.0
