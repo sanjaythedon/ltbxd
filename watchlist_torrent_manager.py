@@ -1,9 +1,13 @@
 import sys
 import importlib.util
+import os
 from google_sheets_utility import GoogleSheetsUtility
 from proxy_utility import ProxyUtility
 import time
 import requests
+
+# Get the directory where the script is located
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 def import_module_from_file(file_path, module_name):
     """Dynamically import a module from a file path."""
@@ -13,10 +17,10 @@ def import_module_from_file(file_path, module_name):
     spec.loader.exec_module(module)
     return module
 
-# Import necessary modules from the other script files
-movies_module = import_module_from_file("movies.py", "movies_module")
-fetch_movie_data_module = import_module_from_file("fetch_movie_data.py", "fetch_movie_data_module")
-yts_torrent_downloader_module = import_module_from_file("yts_torrent_downloader.py", "yts_torrent_downloader_module")
+# Import necessary modules from the other script files with absolute paths
+movies_module = import_module_from_file(os.path.join(script_dir, "movies.py"), "movies_module")
+fetch_movie_data_module = import_module_from_file(os.path.join(script_dir, "fetch_movie_data.py"), "fetch_movie_data_module")
+yts_torrent_downloader_module = import_module_from_file(os.path.join(script_dir, "yts_torrent_downloader.py"), "yts_torrent_downloader_module")
 
 def get_film_ids_from_sheet(credentials_file, sheet_id):
     """Get all film IDs already in the Google Sheet."""
