@@ -51,6 +51,35 @@ def get_film_ids_from_sheet(credentials_file, sheet_id):
     print(f"Found {len(film_ids)} existing film IDs in Google Sheet")
     return film_ids
 
+def get_film_ids_from_not_available_sheet(credentials_file, sheet_id):
+    """Get all film IDs from the NotAvailable sheet in the Google Sheet."""
+    sheets_util = GoogleSheetsUtility(credentials_file)
+    
+    # Get the data from the NotAvailable sheet
+    sheet_data = sheets_util.get_sheet_data(sheet_id, range_name="NotAvailable!A:Z")
+    
+    # Extract film IDs (assuming they're in a column called 'Film ID')
+    film_ids = set()
+    headers = None
+    film_id_index = None
+    
+    for i, row in enumerate(sheet_data):
+        if i == 0:  # Headers row
+            headers = row
+            for j, header in enumerate(headers):
+                if header == "Film ID":
+                    film_id_index = j
+                    break
+            if film_id_index is None:
+                print("Warning: 'Film ID' column not found in NotAvailable sheet")
+                return film_ids
+        else:
+            if film_id_index < len(row) and row[film_id_index]:
+                film_ids.add(row[film_id_index])
+    
+    print(f"Found {len(film_ids)} existing film IDs in NotAvailable sheet")
+    return film_ids
+
 def process_watchlist_and_download_torrents(
     letterboxd_username, 
     output_folder='torrents',
@@ -85,14 +114,18 @@ def process_watchlist_and_download_torrents(
     if credentials_file and sheet_id:
         print(f"2. Checking Google Sheet for existing films")
         existing_film_ids = get_film_ids_from_sheet(credentials_file, sheet_id)
+        not_available_film_ids = get_film_ids_from_not_available_sheet(credentials_file, sheet_id)
         
-        # Filter out movies already in the sheet
+        # Combine both sets of film IDs to exclude
+        all_excluded_film_ids = existing_film_ids.union(not_available_film_ids)
+        
+        # Filter out movies already in either sheet
         filtered_watchlist = [
             movie for movie in watchlist 
-            if not (movie.get("film_id") and movie.get("film_id") in existing_film_ids)
+            if not (movie.get("film_id") and movie.get("film_id") in all_excluded_film_ids)
         ]
         
-        print(f"Filtered out {len(watchlist) - len(filtered_watchlist)} already tracked movies")
+        print(f"Filtered out {len(watchlist) - len(filtered_watchlist)} already tracked or unavailable movies")
         print(f"Processing {len(filtered_watchlist)} new movies")
     
     if not filtered_watchlist:
