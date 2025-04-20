@@ -309,6 +309,41 @@ def process_watchlist_and_download_torrents(
                                 # Sleep to avoid overwhelming the proxy server
                                 print(f"Waiting {request_delay} seconds before next request...")
                                 time.sleep(request_delay)
+                else:
+                    # Handle cases where movie data is not available
+                    print(f"Movie data not available for Letterboxd ID: {letterboxd_id}")
+                    
+                    # Get movie title and year from letterboxd data
+                    movie_title = "Unknown"
+                    movie_year = "Unknown"
+                    
+                    # Try to extract info from watchlist item
+                    for watchlist_item in filtered_watchlist:
+                        if watchlist_item.get('film_id') == letterboxd_id:
+                            movie_title = watchlist_item.get('title', 'Unknown')
+                            movie_year = watchlist_item.get('year', 'Unknown')
+                            break
+                    
+                    # Add to a "not available" sheet in Google Sheets if tracking is enabled
+                    if sheets_util and sheet_id:
+                        # Get all sheet names and check if NotAvailable exists
+                        all_sheet_names = sheets_util.get_all_sheet_names(sheet_id)
+                        not_available_sheet_exists = "NotAvailable" in all_sheet_names
+                        
+                        # Create the sheet if it doesn't exist
+                        if not not_available_sheet_exists:
+                            print("Creating 'NotAvailable' sheet in the spreadsheet...")
+                            headers = ['Movie Name', 'Year', 'Film ID']
+                            sheets_util.create_new_sheet(sheet_id, "NotAvailable", headers)
+                        
+                        # Add the movie to the "not available" sheet
+                        sheets_util.add_movie_entry_to_sheet(
+                            sheet_id=sheet_id,
+                            sheet_name="NotAvailable",
+                            movie_name=movie_title,
+                            year=movie_year,
+                            film_id=letterboxd_id
+                        )
                 
                 # Print progress every 5 entries
                 if processed_entries % 5 == 0 or processed_entries == total_entries:

@@ -190,6 +190,12 @@ class GoogleSheetsUtility:
             List of rows with values
         """
         try:
+            # If range_name contains sheet name with spaces not already in quotes, handle it
+            if '!' in range_name and "'" not in range_name.split('!')[0] and ' ' in range_name.split('!')[0]:
+                sheet_part = range_name.split('!')[0]
+                range_part = range_name.split('!')[1]
+                range_name = f"'{sheet_part}'!{range_part}"
+            
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=sheet_id,
                 range=range_name
@@ -205,4 +211,134 @@ class GoogleSheetsUtility:
             
         except HttpError as error:
             print(f"An error occurred while getting sheet data: {error}")
+            return []
+    
+    def create_new_sheet(self, spreadsheet_id, sheet_title, headers=None):
+        """
+        Creates a new sheet in an existing spreadsheet.
+        
+        Args:
+            spreadsheet_id: ID of the existing spreadsheet
+            sheet_title: Name of the new sheet to create
+            headers: List of column headers to add to the first row
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Create a new sheet in the spreadsheet
+            body = {
+                'requests': [{
+                    'addSheet': {
+                        'properties': {
+                            'title': sheet_title,
+                            'gridProperties': {
+                                'rowCount': 1000,
+                                'columnCount': len(headers) if headers else 5
+                            }
+                        }
+                    }
+                }]
+            }
+            
+            response = self.service.spreadsheets().batchUpdate(
+                spreadsheetId=spreadsheet_id,
+                body=body
+            ).execute()
+            
+            print(f"Created new sheet '{sheet_title}' in spreadsheet")
+            
+            # Add headers if provided
+            if headers:
+                # Handle sheet titles with spaces by enclosing in single quotes
+                formatted_sheet_title = f"'{sheet_title}'" if ' ' in sheet_title else sheet_title
+                
+                body = {
+                    'values': [headers]
+                }
+                
+                self.service.spreadsheets().values().update(
+                    spreadsheetId=spreadsheet_id,
+                    range=f'{formatted_sheet_title}!A1:{chr(65 + len(headers) - 1)}1',
+                    valueInputOption='RAW',
+                    body=body
+                ).execute()
+                
+                print(f"Added headers to sheet '{sheet_title}'")
+            
+            return True
+            
+        except HttpError as error:
+            print(f"An error occurred while creating new sheet: {error}")
+            return False
+    
+    def add_movie_entry_to_sheet(self, sheet_id, sheet_name, movie_name, year, film_id=None):
+        """
+        Add a movie entry to a specific sheet in the tracking spreadsheet.
+        
+        Args:
+            sheet_id: ID of the Google Sheet
+            sheet_name: Name of the sheet to add the entry to
+            movie_name: Name of the movie
+            year: Release year of the movie
+            film_id: Unique identifier of the film
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Handle sheet names with spaces by enclosing in single quotes if needed
+            formatted_sheet_name = f"'{sheet_name}'" if ' ' in sheet_name else sheet_name
+            
+            # Get the next empty row
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=sheet_id,
+                range=f'{formatted_sheet_name}!A:A'
+            ).execute()
+            
+            values = result.get('values', [])
+            next_row = len(values) + 1
+            
+            # Add the new entry
+            body = {
+                'values': [[movie_name, year, film_id]]
+            }
+            
+            self.service.spreadsheets().values().update(
+                spreadsheetId=sheet_id,
+                range=f'{formatted_sheet_name}!A{next_row}:C{next_row}',
+                valueInputOption='RAW',
+                body=body
+            ).execute()
+            
+            print(f"Added entry for '{movie_name} ({year})' to '{sheet_name}' sheet")
+            return True
+            
+        except HttpError as error:
+            print(f"An error occurred while adding movie entry to sheet '{sheet_name}': {error}")
+            return False
+    
+    def get_all_sheet_names(self, spreadsheet_id):
+        """
+        Get a list of all sheet names in a spreadsheet.
+        
+        Args:
+            spreadsheet_id: ID of the Google Sheet
+            
+        Returns:
+            List of sheet names
+        """
+        try:
+            # Get spreadsheet information including sheets
+            spreadsheet = self.service.spreadsheets().get(
+                spreadsheetId=spreadsheet_id
+            ).execute()
+            
+            # Extract sheet names
+            sheet_names = [sheet['properties']['title'] for sheet in spreadsheet.get('sheets', [])]
+            
+            return sheet_names
+            
+        except HttpError as error:
+            print(f"An error occurred while getting sheet names: {error}")
             return [] 
