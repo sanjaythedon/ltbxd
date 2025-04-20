@@ -6,3 +6,4 @@ __pycache__/
 *.png
 torrents/
 ltbxd-457319-b911c40746e0.json
+.env

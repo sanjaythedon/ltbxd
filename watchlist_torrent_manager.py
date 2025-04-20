@@ -5,6 +5,7 @@ from google_sheets_utility import GoogleSheetsUtility
 from proxy_utility import ProxyUtility
 import time
 import requests
+from logfire_definition import logfire
 
 # Get the directory where the script is located
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -42,13 +43,13 @@ def get_film_ids_from_sheet(credentials_file, sheet_id):
                     film_id_index = j
                     break
             if film_id_index is None:
-                print("Warning: 'Film ID' column not found in Google Sheet")
+                logfire.warn("'Film ID' column not found in Google Sheet")
                 return film_ids
         else:
             if film_id_index < len(row) and row[film_id_index]:
                 film_ids.add(row[film_id_index])
     
-    print(f"Found {len(film_ids)} existing film IDs in Google Sheet")
+    logfire.info(f"Found {len(film_ids)} existing film IDs in Google Sheet")
     return film_ids
 
 def get_film_ids_from_not_available_sheet(credentials_file, sheet_id):
@@ -71,13 +72,13 @@ def get_film_ids_from_not_available_sheet(credentials_file, sheet_id):
                     film_id_index = j
                     break
             if film_id_index is None:
-                print("Warning: 'Film ID' column not found in NotAvailable sheet")
+                logfire.warn("'Film ID' column not found in NotAvailable sheet")
                 return film_ids
         else:
             if film_id_index < len(row) and row[film_id_index]:
                 film_ids.add(row[film_id_index])
     
-    print(f"Found {len(film_ids)} existing film IDs in NotAvailable sheet")
+    logfire.info(f"Found {len(film_ids)} existing film IDs in NotAvailable sheet")
     return film_ids
 
 def process_watchlist_and_download_torrents(
@@ -99,20 +100,20 @@ def process_watchlist_and_download_torrents(
         sheet_id: Google Sheet ID for tracking
         share_with_email: Email to share the sheet with
     """
-    print(f"1. Fetching watchlist for user: {letterboxd_username}")
+    logfire.info(f"Fetching watchlist for user: {letterboxd_username}")
     # Get watchlist using the getWatchlist function from movies.py
     watchlist = movies_module.getWatchlist(letterboxd_username)
     
     if not watchlist:
-        print("No movies found in watchlist. Exiting.")
+        logfire.warn("No movies found in watchlist. Exiting.")
         return
     
-    print(f"Found {len(watchlist)} movies in watchlist")
+    logfire.info(f"Found {len(watchlist)} movies in watchlist")
     
     # If we have a Google Sheet, filter out movies already in it
     filtered_watchlist = watchlist
     if credentials_file and sheet_id:
-        print(f"2. Checking Google Sheet for existing films")
+        logfire.info("Checking Google Sheet for existing films")
         existing_film_ids = get_film_ids_from_sheet(credentials_file, sheet_id)
         not_available_film_ids = get_film_ids_from_not_available_sheet(credentials_file, sheet_id)
         
@@ -125,18 +126,18 @@ def process_watchlist_and_download_torrents(
             if not (movie.get("film_id") and movie.get("film_id") in all_excluded_film_ids)
         ]
         
-        print(f"Filtered out {len(watchlist) - len(filtered_watchlist)} already tracked or unavailable movies")
-        print(f"Processing {len(filtered_watchlist)} new movies")
+        logfire.info(f"Filtered out {len(watchlist) - len(filtered_watchlist)} already tracked or unavailable movies")
+        logfire.info(f"Processing {len(filtered_watchlist)} new movies")
     
     if not filtered_watchlist:
-        print("No new movies to process. Exiting.")
+        logfire.info("No new movies to process. Exiting.")
         return
     
     # Initialize the proxy utility
     proxy_util = ProxyUtility()
     
     # Dictionary to store all responses from YTS API
-    print(f"3. Fetching YTS movie data for {len(filtered_watchlist)} movies")
+    logfire.info(f"Fetching YTS movie data for {len(filtered_watchlist)} movies")
     movie_data_dict = {}
     
     # Process each movie in the filtered watchlist
@@ -147,7 +148,7 @@ def process_watchlist_and_download_torrents(
         if not movie_id:
             continue
         
-        print(f"Fetching data for movie: {movie.get('title')} (ID: {movie_id})")
+        logfire.info(f"Fetching data for movie: {movie.get('title')} (ID: {movie_id})")
         
         # Replace minus signs with %20 in the movie ID
         formatted_id = movie_id.replace('-', '%20')
@@ -160,19 +161,19 @@ def process_watchlist_and_download_torrents(
         
         # If proxy request failed, try a direct request
         if not response:
-            print(f"Proxy request failed, attempting direct request for {movie_id}")
+            logfire.warn(f"Proxy request failed, attempting direct request for {movie_id}")
             try:
                 headers = {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                 }
                 response = requests.get(url, headers=headers, timeout=10)
                 if response.status_code == 200:
-                    print(f"Direct request successful for {movie_id}")
+                    logfire.info(f"Direct request successful for {movie_id}")
                 else:
-                    print(f"Direct request failed with status code {response.status_code}")
+                    logfire.error(f"Direct request failed with status code {response.status_code}")
                     response = None
             except Exception as e:
-                print(f"Error with direct request: {e}")
+                logfire.error(f"Error with direct request: {e}")
                 response = None
         
         if response:
@@ -181,18 +182,18 @@ def process_watchlist_and_download_torrents(
                 movie_data = response.json()
                 # movie_data['film_id'] = letterboxd_id
                 movie_data_dict[letterboxd_id] = movie_data
-                print(f"Successfully fetched data for {movie_id}")
+                logfire.info(f"Successfully fetched data for {movie_id}")
             except Exception as e:
-                print(f"Error parsing response for {movie_id}: {e}")
+                logfire.error(f"Error parsing response for {movie_id}: {e}")
         else:
-            print(f"Failed to get data for {movie_id}")
+            logfire.error(f"Failed to get data for {movie_id}")
         
         # Add a small delay to avoid overwhelming the API
         time.sleep(request_delay)
     
     # Download torrents using the movie data we just fetched
     if movie_data_dict:
-        print(f"4. Downloading torrents for {len(movie_data_dict)} movies")
+        logfire.info(f"Downloading torrents for {len(movie_data_dict)} movies")
         
         # Initialize the downloader by importing the required function from yts_torrent_downloader.py
         yts_torrent_downloader = yts_torrent_downloader_module.download_best_quality_torrents
@@ -209,7 +210,7 @@ def process_watchlist_and_download_torrents(
             # Create output folder if it doesn't exist
             if not os.path.exists(output_folder):
                 os.makedirs(output_folder)
-                print(f"Created output folder: {output_folder}")
+                logfire.info(f"Created output folder: {output_folder}")
             
             # Initialize proxy utility
             proxy_util = ProxyUtility()
@@ -221,14 +222,14 @@ def process_watchlist_and_download_torrents(
                     sheets_util = GoogleSheetsUtility(credentials_file)
                     if not sheet_id:
                         sheet_id = sheets_util.create_movie_tracking_sheet(share_with=share_with_email)
-                        print(f"Created a new tracking sheet with ID: {sheet_id}")
+                        logfire.info(f"Created a new tracking sheet with ID: {sheet_id}")
                     elif share_with_email and sheets_util:
                         # Share existing sheet if email is provided
                         sheets_util.share_sheet(sheet_id, share_with_email)
                         
-                    print(f"Using Google Sheet ID: {sheet_id} for tracking downloads")
+                    logfire.info(f"Using Google Sheet ID: {sheet_id} for tracking downloads")
                 except Exception as e:
-                    print(f"WARNING: Could not initialize Google Sheets tracking: {e}")
+                    logfire.error(f"WARNING: Could not initialize Google Sheets tracking: {e}")
                     sheets_util = None
             
             # Count variables for stats
@@ -238,8 +239,8 @@ def process_watchlist_and_download_torrents(
             quality_stats = {'2160p': 0, '1080p_bluray': 0, '1080p_web': 0}
             successful_downloads = 0
             
-            print(f"Processing {total_entries} entries...")
-            print(f"Using {request_delay} second delay between requests")
+            logfire.info(f"Processing {total_entries} entries...")
+            logfire.info(f"Using {request_delay} second delay between requests")
             
             # Process each entry in the dictionary
             for letterboxd_id, movie_data in movie_data_dict.items():
@@ -287,7 +288,7 @@ def process_watchlist_and_download_torrents(
                                 torrent_url = selected_torrent['url']
                                 film_id = movie.get('id', None)  # Get the unique film ID
                                 
-                                print(f"Found {quality_type} torrent for '{movie_title} ({movie_year})': {torrent_url}")
+                                logfire.info(f"Found {quality_type} torrent for '{movie_title} ({movie_year})': {torrent_url}")
                                 
                                 # Create a safe filename
                                 safe_title = "".join([c if c.isalnum() or c in ' ._-' else '_' for c in movie_title])
@@ -301,19 +302,19 @@ def process_watchlist_and_download_torrents(
                                     
                                     # If proxy request failed, try a direct request
                                     if not response:
-                                        print(f"Proxy request failed, attempting direct request for torrent")
+                                        logfire.warn(f"Proxy request failed, attempting direct request for torrent")
                                         try:
                                             headers = {
                                                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                                             }
                                             response = requests.get(torrent_url, headers=headers, timeout=10)
                                             if response.status_code == 200:
-                                                print(f"Direct torrent request successful")
+                                                logfire.info(f"Direct torrent request successful")
                                             else:
-                                                print(f"Direct torrent request failed with status code {response.status_code}")
+                                                logfire.error(f"Direct torrent request failed with status code {response.status_code}")
                                                 response = None
                                         except Exception as e:
-                                            print(f"Error with direct torrent request: {e}")
+                                            logfire.error(f"Error with direct torrent request: {e}")
                                             response = None
                                     
                                     if response:
@@ -323,7 +324,7 @@ def process_watchlist_and_download_torrents(
                                         
                                         download_success = True
                                         successful_downloads += 1
-                                        print(f"Successfully downloaded to {file_path}")
+                                        logfire.info(f"Successfully downloaded to {file_path}")
                                         
                                         # Add to Google Sheet if tracking is enabled
                                         if sheets_util and sheet_id:
@@ -335,16 +336,16 @@ def process_watchlist_and_download_torrents(
                                                 is_downloaded=True
                                             )
                                     else:
-                                        print(f"Failed to download torrent for {movie_title}")
+                                        logfire.error(f"Failed to download torrent for {movie_title}")
                                 except Exception as e:
-                                    print(f"Error downloading {movie_title} torrent: {e}")
+                                    logfire.error(f"Error downloading {movie_title} torrent: {e}")
                                 
                                 # Sleep to avoid overwhelming the proxy server
-                                print(f"Waiting {request_delay} seconds before next request...")
+                                logfire.debug(f"Waiting {request_delay} seconds before next request...")
                                 time.sleep(request_delay)
                 else:
                     # Handle cases where movie data is not available
-                    print(f"Movie data not available for Letterboxd ID: {letterboxd_id}")
+                    logfire.warn(f"Movie data not available for Letterboxd ID: {letterboxd_id}")
                     
                     # Get movie title and year from letterboxd data
                     movie_title = "Unknown"
@@ -365,7 +366,7 @@ def process_watchlist_and_download_torrents(
                         
                         # Create the sheet if it doesn't exist
                         if not not_available_sheet_exists:
-                            print("Creating 'NotAvailable' sheet in the spreadsheet...")
+                            logfire.info("Creating 'NotAvailable' sheet in the spreadsheet...")
                             headers = ['Movie Name', 'Year', 'Film ID']
                             sheets_util.create_new_sheet(sheet_id, "NotAvailable", headers)
                         
@@ -380,20 +381,20 @@ def process_watchlist_and_download_torrents(
                 
                 # Print progress every 5 entries
                 if processed_entries % 5 == 0 or processed_entries == total_entries:
-                    print(f"Progress: {processed_entries}/{total_entries} entries processed")
+                    logfire.info(f"Progress: {processed_entries}/{total_entries} entries processed")
             
             # Print summary
-            print("\n--- Download Summary ---")
-            print(f"Total entries processed: {processed_entries}")
-            print(f"Movies with matching torrents found: {movies_with_torrents}")
-            print(f"Quality breakdown:")
-            print(f"  - 2160p: {quality_stats['2160p']}")
-            print(f"  - 1080p Bluray: {quality_stats['1080p_bluray']}")
-            print(f"  - 1080p Web: {quality_stats['1080p_web']}")
-            print(f"Successfully downloaded torrents: {successful_downloads}")
-            print(f"Torrents saved to: {os.path.abspath(output_folder)}")
+            logfire.info("\n--- Download Summary ---")
+            logfire.info(f"Total entries processed: {processed_entries}")
+            logfire.info(f"Movies with matching torrents found: {movies_with_torrents}")
+            logfire.info(f"Quality breakdown:")
+            logfire.info(f"  - 2160p: {quality_stats['2160p']}")
+            logfire.info(f"  - 1080p Bluray: {quality_stats['1080p_bluray']}")
+            logfire.info(f"  - 1080p Web: {quality_stats['1080p_web']}")
+            logfire.info(f"Successfully downloaded torrents: {successful_downloads}")
+            logfire.info(f"Torrents saved to: {os.path.abspath(output_folder)}")
             if sheets_util and sheet_id:
-                print(f"Download tracking available at: https://docs.google.com/spreadsheets/d/{sheet_id}")
+                logfire.info(f"Download tracking available at: https://docs.google.com/spreadsheets/d/{sheet_id}")
             
             return successful_downloads
         
@@ -410,10 +411,11 @@ def process_watchlist_and_download_torrents(
             share_with_email=share_with_email
         )
     else:
-        print("No movie data found to download torrents for")
+        logfire.warn("No movie data found to download torrents for")
 
 if __name__ == "__main__":
     # Set your preferences here
+    logfire.info("Starting watchlist torrent manager")
     process_watchlist_and_download_torrents(
         letterboxd_username="kokkithedon",  # Replace with your Letterboxd username
         output_folder=os.path.join(script_dir, "torrents"),
@@ -422,3 +424,4 @@ if __name__ == "__main__":
         sheet_id='1S6yZ5osVGhfmqwFKQbKfPg5B2j0CqKTAmUHnJIhB6pA',
         share_with_email='shanjairajan54@gmail.com'
     ) 
+    logfire.info("Finished processing watchlist") 
